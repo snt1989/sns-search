@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SNS横断検索</title>
+<style>
+  :root{--bg:#f6f5f1;--card:#fff;--ink:#1d1d1b;--muted:#6b6a65;--line:#e3e1da;--accent:#1f5eff;--accent-ink:#fff;--chip:#ecebe5;--warn:#b45309;--ok:#15803d}
+  @media (prefers-color-scheme:dark){:root{--bg:#151513;--card:#1f1f1c;--ink:#f0efe9;--muted:#9a9890;--line:#34332e;--accent:#6d97ff;--accent-ink:#0b1020;--chip:#2a2a26;--warn:#f59e0b;--ok:#4ade80}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic UI","Noto Sans JP",sans-serif;line-height:1.6}
+  .wrap{max-width:1040px;margin:0 auto;padding:28px 18px 70px}
+  h1{font-size:24px;margin:0 0 4px}
+  .sub{color:var(--muted);margin:0 0 20px;font-size:14px}
+  button{font:inherit;cursor:pointer}
+  form.search{display:flex;gap:8px;flex-wrap:wrap}
+  .search input{flex:1;min-width:200px;font-size:17px;padding:13px 16px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);outline:none}
+  .search input:focus{border-color:var(--accent)}
+  .go{padding:13px 24px;border-radius:12px;border:0;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:16px}
+  .go:disabled{opacity:.6}
+  .opts{display:flex;flex-wrap:wrap;gap:10px 18px;margin:14px 0 4px;align-items:center;font-size:14px}
+  .seg{display:inline-flex;background:var(--chip);border-radius:10px;padding:3px}
+  .seg button{border:0;background:transparent;color:var(--muted);padding:6px 12px;border-radius:8px;font-size:13px}
+  .seg button.on{background:var(--card);color:var(--ink);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+  .srcs{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 0}
+  .src{border:1.5px solid var(--line);background:var(--card);color:var(--ink);padding:5px 12px;border-radius:99px;font-size:13px;display:inline-flex;gap:6px;align-items:center}
+  .src.off{opacity:.45}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+  .dot.ready{background:var(--ok)}
+  .legend{font-size:12px;color:var(--muted);margin:8px 0 0}
+  .panels{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px;margin-top:20px}
+  .panel{background:var(--card);border:1.5px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;max-height:640px}
+  .ph{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line)}
+  .ph b{font-size:15px}
+  .ph .cnt{color:var(--muted);font-size:12px}
+  .ph a{margin-left:auto;font-size:12px;color:var(--accent);text-decoration:none}
+  .items{overflow:auto;padding:4px 0}
+  .item{display:block;padding:10px 14px;border-bottom:1px solid var(--line);color:inherit;text-decoration:none}
+  .item:last-child{border-bottom:0}
+  .item:hover{background:var(--chip)}
+  .it{font-weight:700;font-size:14px;margin-bottom:2px}
+  .tx{font-size:13px;color:var(--ink);word-break:break-word}
+  .meta{font-size:11.5px;color:var(--muted);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap}
+  .row{display:flex;gap:10px}
+  .row img{width:84px;height:56px;object-fit:cover;border-radius:6px;flex:none;background:var(--chip)}
+  .msg{padding:16px 14px;font-size:13px;color:var(--muted)}
+  .msg.err{color:var(--warn)}
+  .msg a{color:var(--accent)}
+  .msg code{background:var(--chip);padding:1px 5px;border-radius:4px;font-size:12px}
+  .links{margin-top:26px}
+  .links h2{font-size:14px;margin:0 0 8px;color:var(--muted);font-weight:600}
+  .links .grid{display:flex;flex-wrap:wrap;gap:6px}
+  .links a{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:6px 12px;border-radius:99px;font-size:13px;text-decoration:none}
+  .links a.disabled{opacity:.4;pointer-events:none}
+  .lock{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;place-items:center;z-index:5}
+  .lock.show{display:grid}
+  .lock form{background:var(--card);padding:22px;border-radius:14px;width:min(340px,90vw);display:flex;flex-direction:column;gap:10px}
+  .lock input{padding:10px 12px;border-radius:10px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);font-size:16px}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:s .7s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes s{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>SNS横断検索</h1>
+  <p class="sub">APIで各SNSの投稿を取得し、このページの中に並べて表示します。キー未設定のSNSは、公式サイトの検索リンクを使えます。</p>
+
+  <form class="search" id="form">
+    <input id="q" type="text" placeholder="例：京都 カフェ / 生成AI / 桜" autocomplete="off" autofocus>
+    <button class="go" id="go" type="submit">検索</button>
+  </form>
+
+  <div class="opts">
+    <span class="seg" id="mode"><button type="button" data-v="kw" class="on">キーワード</button><button type="button" data-v="tag">ハッシュタグ</button></span>
+    <span class="seg" id="sort"><button type="button" data-v="relevance" class="on">関連度順</button><button type="button" data-v="latest">新着順</button></span>
+    <span class="seg" id="view"><button type="button" data-v="all" class="on">まとめて表示</button><button type="button" data-v="by">SNS別</button></span>
+  </div>
+
+  <div class="srcs" id="srcs"></div>
+  <div class="legend"><span class="dot ready" style="display:inline-block"></span> 利用可能　<span class="dot" style="display:inline-block"></span> APIキー未設定（設定するとアプリ内に表示）</div>
+
+  <div class="panels" id="panels"></div>
+
+  <div class="links">
+    <h2>公式サイトで直接検索する（アプリ内に出ないSNS向け）</h2>
+    <div class="grid" id="links"></div>
+  </div>
+</div>
+
+<div class="lock" id="lock"><form id="lockForm"><b>パスワードを入力</b><input id="pw" type="password" autocomplete="current-password"><button class="go" type="submit">開く</button><span id="lockErr" style="color:var(--warn);font-size:13px"></span></form></div>
+
+<script>
+(function(){
+  const $ = (id) => document.getElementById(id);
+  // 公式サイト検索リンク（APIを使わないSNS）
+  const LINKS = [
+    ['Instagram', null, 'https://www.instagram.com/explore/tags/{t}/'],
+    ['TikTok', 'https://www.tiktok.com/search?q={q}', 'https://www.tiktok.com/tag/{t}'],
+    ['Facebook', 'https://www.facebook.com/search/top?q={q}', 'https://www.facebook.com/hashtag/{t}'],
+    ['Threads', 'https://www.threads.net/search?q={q}', 'https://www.threads.net/search?q=%23{t}&serp_type=tags'],
+    ['Pinterest', 'https://www.pinterest.com/search/pins/?q={q}', 'https://www.pinterest.com/search/pins/?q=%23{t}'],
+    ['LinkedIn', 'https://www.linkedin.com/search/results/content/?keywords={q}', 'https://www.linkedin.com/feed/hashtag/{t}/'],
+    ['Yahoo!リアルタイム', 'https://search.yahoo.co.jp/realtime/search?p={q}', 'https://search.yahoo.co.jp/realtime/search?p=%23{t}'],
+    ['note', 'https://note.com/search?q={q}&context=note', 'https://note.com/hashtag/{t}'],
+    ['ニコニコ', 'https://www.nicovideo.jp/search/{q}', 'https://www.nicovideo.jp/tag/{t}'],
+    ['Zenn', 'https://zenn.dev/search?q={q}', 'https://zenn.dev/topics/{t}'],
+    ['Tumblr', 'https://www.tumblr.com/search/{q}', 'https://www.tumblr.com/tagged/{t}']
+  ];
+  // 各APIソースの「公式サイトで開く」リンク
+  const OPEN = {
+    youtube:['https://www.youtube.com/results?search_query={q}','https://www.youtube.com/hashtag/{t}'],
+    x:['https://x.com/search?q={q}&src=typed_query','https://x.com/hashtag/{t}'],
+    reddit:['https://www.reddit.com/search/?q={q}','https://www.reddit.com/search/?q=%23{t}'],
+    bluesky:['https://bsky.app/search?q={q}','https://bsky.app/hashtag/{t}'],
+    mastodon:['https://mastodon.social/search?q={q}','https://mastodon.social/tags/{t}'],
+    hackernews:['https://hn.algolia.com/?q={q}','https://hn.algolia.com/?q=%23{t}'],
+    hatena:['https://b.hatena.ne.jp/search/text?q={q}','https://b.hatena.ne.jp/search/tag?q={t}'],
+    web:['https://www.google.com/search?q={q}',null],
+    qiita:['https://qiita.com/search?q={q}','https://qiita.com/tags/{t}']
+  };
+  const ORDER = ['youtube','x','bluesky','reddit','mastodon','web','hatena','qiita','hackernews'];
+
+  let status = {}, enabled = new Set(), mode='kw', sort='relevance', view='all', last=null, pw='';
+  try { pw = sessionStorage.getItem('snspw') || ''; } catch(e){}
+
+  function tagOf(v){ return v.replace(/^[#＃]+/,'').trim().split(/\s+/)[0] || ''; }
+  function build(tpl, q){
+    if(!tpl) return null;
+    const t = tagOf(q);
+    if(tpl.includes('{t}')) return t ? tpl.replace('{t}', encodeURIComponent(t)) : null;
+    return tpl.replace('{q}', encodeURIComponent(q));
+  }
+  function openUrl(id, q){
+    const p = OPEN[id]; if(!p||!q) return null;
+    return mode==='tag' ? build(p[1], q) : build(p[0], q);
+  }
+  function fmtDate(s){
+    if(!s) return '';
+    const d = new Date(s); if(isNaN(d)) return '';
+    const diff=(Date.now()-d)/1000;
+    if(diff<3600) return Math.max(1,Math.floor(diff/60))+'分前';
+    if(diff<86400) return Math.floor(diff/3600)+'時間前';
+    if(diff<86400*30) return Math.floor(diff/86400)+'日前';
+    return d.toLocaleDateString('ja-JP');
+  }
+  function el(tag, cls, text){ const e=document.createElement(tag); if(cls) e.className=cls; if(text!==undefined) e.textContent=text; return e; }
+
+  async function api(params){
+    const res = await fetch('/api/search?'+new URLSearchParams(params), {headers: pw?{'x-app-password':pw}:{}});
+    if(res.status===401){ showLock(); throw new Error('locked'); }
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    return res.json();
+  }
+
+  function showLock(msg){ $('lock').classList.add('show'); $('lockErr').textContent = msg||''; setTimeout(()=>$('pw').focus(),50); }
+  $('lockForm').addEventListener('submit', async e=>{
+    e.preventDefault(); pw=$('pw').value;
+    try{ await api({status:1}); try{sessionStorage.setItem('snspw',pw);}catch(_){} $('lock').classList.remove('show'); init(); }
+    catch(err){ $('lockErr').textContent='パスワードが違います'; }
+  });
+
+  function renderSrcs(){
+    const box=$('srcs'); box.innerHTML='';
+    ORDER.filter(id=>status[id]).forEach(id=>{
+      const s=status[id];
+      const b=el('button','src'+(enabled.has(id)?'':' off')); b.type='button';
+      const d=el('span','dot'+(s.ready?' ready':'')); b.append(d, s.name);
+      b.onclick=()=>{ enabled.has(id)?enabled.delete(id):enabled.add(id); try{localStorage.setItem('snsEnabled',JSON.stringify([...enabled]));}catch(_){} renderSrcs(); };
+      box.appendChild(b);
+    });
+  }
+
+  function renderLinks(q){
+    const g=$('links'); g.innerHTML='';
+    LINKS.forEach(([name,kw,tg])=>{
+      const a=el('a',null,name); a.target='_blank'; a.rel='noopener noreferrer';
+      const u = q ? (mode==='tag'?build(tg,q):build(kw,q)) : null;
+      if(u) a.href=u; else a.className='disabled';
+      g.appendChild(a);
+    });
+  }
+
+  function itemNode(it, showSrc){
+    const a=el('a','item'); a.href=it.url; a.target='_blank'; a.rel='noopener noreferrer';
+    const row=el('div','row');
+    if(it.thumb && /^https?:/.test(it.thumb)){ const im=el('img'); im.src=it.thumb; im.loading='lazy'; im.referrerPolicy='no-referrer'; im.alt=''; row.appendChild(im); }
+    const body=el('div');
+    if(it.title) body.appendChild(el('div','it',it.title));
+    if(it.text) body.appendChild(el('div','tx',it.text));
+    const meta=el('div','meta');
+    if(showSrc) meta.appendChild(el('span',null,'['+showSrc+']'));
+    [it.author, fmtDate(it.date), it.metrics].forEach(x=>{ if(x) meta.appendChild(el('span',null,x)); });
+    body.appendChild(meta); row.appendChild(body); a.appendChild(row);
+    return a;
+  }
+
+  let filter = null; // 表示するSNS名（nullは全部）
+  function collect(data, ids){
+    const groups = {};   // 表示名 -> items[]
+    const failed = [];
+    ids.forEach(id=>{
+      const r=data.results[id]; if(!r) return;
+      if(!r.ok){ failed.push({id, r}); return; }
+      r.items.forEach(i=>{ const label=i.srcLabel||status[id].name; (groups[label]=groups[label]||[]).push({...i,_s:label}); });
+    });
+    return {groups, failed};
+  }
+  function mergeItems(groups, sortMode){
+    const lists = Object.values(groups);
+    if(sortMode==='latest'){
+      return lists.flat().sort((a,b)=>(new Date(b.date)||0)-(new Date(a.date)||0));
+    }
+    // 関連度順: 各SNSから1件ずつ順番に取り出して混ぜる（1つのSNSに偏らないように）
+    const out=[]; let i=0, more=true;
+    while(more){ more=false; lists.forEach(l=>{ if(l[i]){ out.push(l[i]); more=true; } }); i++; }
+    return out;
+  }
+
+  function render(){
+    const P=$('panels'); P.innerHTML='';
+    if(!last) return;
+    const {q, data} = last;
+    const ids = ORDER.filter(id=>enabled.has(id) && status[id]);
+    const {groups, failed} = collect(data, ids);
+
+    if(view==='all'){
+      const total = Object.values(groups).reduce((n,l)=>n+l.length,0);
+      const wrap=el('div','panel'); wrap.style.gridColumn='1 / -1'; wrap.style.maxHeight='none';
+
+      // SNS名の絞り込みチップ（件数つき）
+      const chips=el('div','srcs'); chips.style.padding='12px 14px 0';
+      const mk=(label,count,key)=>{ const b=el('button','src'+(filter===key?'':' off')); b.type='button'; b.textContent=label+' '+count; b.onclick=()=>{filter=key; render();}; return b; };
+      chips.appendChild(mk('すべて', total, null));
+      Object.entries(groups).sort((a,b)=>b[1].length-a[1].length).forEach(([label,l])=>chips.appendChild(mk(label,l.length,label)));
+      wrap.appendChild(chips);
+
+      // 取得できなかったSNSは1行にまとめる
+      if(failed.length){
+        const f=el('div','msg err'); f.style.paddingBottom='4px';
+        f.append('表示できなかったSNS：');
+        failed.forEach(({id,r},i)=>{
+          if(i) f.append('、');
+          const reason = r.reason==='no_key' ? 'キー未設定('+(r.needs||[]).join(', ')+')' : (r.message||'取得失敗');
+          const u=openUrl(id,q);
+          if(u){ const a=el('a',null,status[id].name); a.href=u; a.target='_blank'; a.rel='noopener noreferrer'; f.appendChild(a); } else f.append(status[id].name);
+          f.append(' '+reason);
+        });
+        wrap.appendChild(f);
+      }
+
+      const box=el('div','items'); box.style.maxHeight='none';
+      let list = mergeItems(filter&&groups[filter]?{[filter]:groups[filter]}:groups, sort);
+      list.forEach(i=>box.appendChild(itemNode(i,i._s)));
+      if(!list.length) box.appendChild(el('div','msg','表示できる結果がありません。'));
+      wrap.appendChild(box); P.appendChild(wrap);
+      return;
+    }
+
+    ids.forEach(id=>{
+      const r=data.results[id]; if(!r) return;
+      if(!r.ok){ P.appendChild(failPanel(id,r,q)); return; }
+      const panel=el('div','panel');
+      const h=el('div','ph'); h.appendChild(el('b',null,status[id].name)); h.appendChild(el('span','cnt',r.items.length+'件'));
+      const u=openUrl(id,q); if(u){ const a=el('a',null,'サイトで開く ↗'); a.href=u; a.target='_blank'; a.rel='noopener noreferrer'; h.appendChild(a); }
+      panel.appendChild(h);
+      const box=el('div','items');
+      r.items.forEach(i=>box.appendChild(itemNode(i, i.srcLabel)));
+      if(!r.items.length) box.appendChild(el('div','msg','該当する投稿が見つかりませんでした。'));
+      panel.appendChild(box); P.appendChild(panel);
+    });
+  }
+
+  function failPanel(id,r,q){
+    const panel=el('div','panel');
+    const h=el('div','ph'); h.appendChild(el('b',null,status[id].name));
+    const u=openUrl(id,q); if(u){ const a=el('a',null,'サイトで開く ↗'); a.href=u; a.target='_blank'; a.rel='noopener noreferrer'; h.appendChild(a); }
+    panel.appendChild(h);
+    const m=el('div','msg'+(r.reason==='error'?' err':''));
+    if(r.reason==='no_key'){
+      m.append('APIキー未設定です。Vercelの環境変数に ');
+      (r.needs||[]).forEach((k,i)=>{ if(i) m.append(' と '); m.appendChild(el('code',null,k)); });
+      m.append(' を設定すると、ここに結果が表示されます。');
+    } else m.textContent = r.message || '取得に失敗しました';
+    panel.appendChild(m); return panel;
+  }
+
+  async function search(){
+    const q=$('q').value.trim(); if(!q) return;
+    const ids=ORDER.filter(id=>enabled.has(id)&&status[id]);
+    $('go').disabled=true;
+    const P=$('panels'); P.innerHTML=''; const w=el('div','msg'); w.appendChild(el('span','spin')); w.append('検索中…'); P.appendChild(w);
+    renderLinks(q);
+    try{
+      const data=await api({q, mode, sort, sources: ids.join(',')});
+      last={q,data}; filter=null; render();
+    }catch(e){
+      if(e.message!=='locked'){ P.innerHTML=''; P.appendChild(el('div','msg err','検索に失敗しました: '+e.message)); }
+    }finally{ $('go').disabled=false; }
+  }
+
+  function seg(id, set){
+    $(id).querySelectorAll('button').forEach(b=>b.onclick=()=>{
+      $(id).querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
+      set(b.dataset.v);
+    });
+  }
+  seg('mode', v=>{ mode=v; if($('q').value.trim()) search(); else renderLinks(''); });
+  seg('sort', v=>{ sort=v; if($('q').value.trim()) search(); });
+  seg('view', v=>{ view=v; render(); });
+  $('form').addEventListener('submit', e=>{ e.preventDefault(); search(); });
+
+  async function init(){
+    try{
+      const s=await api({status:1}); status=s.sources;
+      let saved=null; try{ saved=JSON.parse(localStorage.getItem('snsEnabled')||'null'); }catch(_){}
+      enabled = new Set(Array.isArray(saved) ? saved.filter(id=>status[id]) : ORDER.filter(id=>status[id] && status[id].ready));
+      if(!enabled.size) ORDER.forEach(id=>status[id]&&enabled.add(id));
+      renderSrcs(); renderLinks('');
+    }catch(e){ if(e.message!=='locked') $('panels').appendChild(el('div','msg err','サーバーに接続できません: '+e.message)); }
+  }
+  init();
+})();
+</script>
+</body>
+</html>
