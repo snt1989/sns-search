@@ -77,12 +77,13 @@
   </div>
 
   <div class="srcs" id="srcs"></div>
+  <div class="srcs" id="quick"></div>
   <div class="legend"><span class="dot ready" style="display:inline-block"></span> 利用可能　<span class="dot" style="display:inline-block"></span> APIキー未設定（設定するとアプリ内に表示）</div>
 
   <div class="panels" id="panels"></div>
 
   <div class="links">
-    <h2>公式サイトで直接検索する（アプリ内に出ないSNS向け）</h2>
+    <h2>公式サイトで直接検索する（その他のSNS）</h2>
     <div class="grid" id="links"></div>
   </div>
 </div>
@@ -94,12 +95,6 @@
   const $ = (id) => document.getElementById(id);
   // 公式サイト検索リンク（APIを使わないSNS）
   const LINKS = [
-    ['Instagram', null, 'https://www.instagram.com/explore/tags/{t}/'],
-    ['TikTok', 'https://www.tiktok.com/search?q={q}', 'https://www.tiktok.com/tag/{t}'],
-    ['Facebook', 'https://www.facebook.com/search/top?q={q}', 'https://www.facebook.com/hashtag/{t}'],
-    ['Threads', 'https://www.threads.net/search?q={q}', 'https://www.threads.net/search?q=%23{t}&serp_type=tags'],
-    ['Pinterest', 'https://www.pinterest.com/search/pins/?q={q}', 'https://www.pinterest.com/search/pins/?q=%23{t}'],
-    ['LinkedIn', 'https://www.linkedin.com/search/results/content/?keywords={q}', 'https://www.linkedin.com/feed/hashtag/{t}/'],
     ['Yahoo!リアルタイム', 'https://search.yahoo.co.jp/realtime/search?p={q}', 'https://search.yahoo.co.jp/realtime/search?p=%23{t}'],
     ['note', 'https://note.com/search?q={q}&context=note', 'https://note.com/hashtag/{t}'],
     ['ニコニコ', 'https://www.nicovideo.jp/search/{q}', 'https://www.nicovideo.jp/tag/{t}'],
@@ -115,10 +110,15 @@
     mastodon:['https://mastodon.social/search?q={q}','https://mastodon.social/tags/{t}'],
     hackernews:['https://hn.algolia.com/?q={q}','https://hn.algolia.com/?q=%23{t}'],
     hatena:['https://b.hatena.ne.jp/search/text?q={q}','https://b.hatena.ne.jp/search/tag?q={t}'],
-    web:['https://www.google.com/search?q={q}',null],
+    instagram:['https://www.google.com/search?q=site%3Ainstagram.com+{q}','https://www.instagram.com/explore/tags/{t}/'],
+    threads:['https://www.threads.net/search?q={q}','https://www.threads.net/search?q=%23{t}&serp_type=tags'],
+    tiktok:['https://www.tiktok.com/search?q={q}','https://www.tiktok.com/tag/{t}'],
+    facebook:['https://www.facebook.com/search/top?q={q}','https://www.facebook.com/hashtag/{t}'],
+    pinterest:['https://www.pinterest.com/search/pins/?q={q}','https://www.pinterest.com/search/pins/?q=%23{t}'],
+    linkedin:['https://www.linkedin.com/search/results/content/?keywords={q}','https://www.linkedin.com/feed/hashtag/{t}/'],
     qiita:['https://qiita.com/search?q={q}','https://qiita.com/tags/{t}']
   };
-  const ORDER = ['youtube','x','bluesky','reddit','mastodon','web','hatena','qiita','hackernews'];
+  const ORDER = ['instagram','threads','youtube','x','bluesky','reddit','mastodon','tiktok','facebook','pinterest','linkedin','hatena','qiita','hackernews'];
 
   let status = {}, enabled = new Set(), mode='kw', sort='relevance', view='all', last=null, pw='';
   try { pw = sessionStorage.getItem('snspw') || ''; } catch(e){}
@@ -165,7 +165,17 @@
       const s=status[id];
       const b=el('button','src'+(enabled.has(id)?'':' off')); b.type='button';
       const d=el('span','dot'+(s.ready?' ready':'')); b.append(d, s.name);
-      b.onclick=()=>{ enabled.has(id)?enabled.delete(id):enabled.add(id); try{localStorage.setItem('snsEnabled',JSON.stringify([...enabled]));}catch(_){} renderSrcs(); };
+      b.onclick=()=>{ enabled.has(id)?enabled.delete(id):enabled.add(id); try{localStorage.setItem('snsEnabled2',JSON.stringify([...enabled]));}catch(_){} renderSrcs(); };
+      box.appendChild(b);
+    });
+  }
+
+  function renderQuick(){
+    const box=$('quick'); box.innerHTML='';
+    const presets=[['Instagram＋Threadsだけ',['instagram','threads']],['Instagramだけ',['instagram']],['Threadsだけ',['threads']],['すべてON',ORDER.filter(id=>status[id])]];
+    presets.forEach(([label,ids])=>{
+      const b=el('button','src',label); b.type='button';
+      b.onclick=()=>{ enabled=new Set(ids.filter(id=>status[id])); try{localStorage.setItem('snsEnabled2',JSON.stringify([...enabled]));}catch(_){} renderSrcs(); if($('q').value.trim()) search(); };
       box.appendChild(b);
     });
   }
@@ -312,10 +322,10 @@
   async function init(){
     try{
       const s=await api({status:1}); status=s.sources;
-      let saved=null; try{ saved=JSON.parse(localStorage.getItem('snsEnabled')||'null'); }catch(_){}
-      enabled = new Set(Array.isArray(saved) ? saved.filter(id=>status[id]) : ORDER.filter(id=>status[id] && status[id].ready));
+      let saved=null; try{ saved=JSON.parse(localStorage.getItem('snsEnabled2')||'null'); }catch(_){}
+      enabled = new Set(Array.isArray(saved) ? saved.filter(id=>status[id]) : ORDER.filter(id=>status[id] && status[id].ready && !status[id].defaultOff));
       if(!enabled.size) ORDER.forEach(id=>status[id]&&enabled.add(id));
-      renderSrcs(); renderLinks('');
+      renderSrcs(); renderQuick(); renderLinks('');
     }catch(e){ if(e.message!=='locked') $('panels').appendChild(el('div','msg err','サーバーに接続できません: '+e.message)); }
   }
   init();

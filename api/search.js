@@ -19,6 +19,29 @@ async function getJson(url, opts = {}) {
 const clip = (s, n = 280) => { s = String(s || '').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n) + '…' : s; };
 const stripHtml = (s) => String(s || '').replace(/<[^>]*>/g, ' ').replace(/&#x([0-9a-f]+);/gi, (m, h) => String.fromCodePoint(parseInt(h, 16))).replace(/&#(\d+);/g, (m, d) => String.fromCodePoint(+d)).replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
 
+
+// Brave Search で特定SNSのページだけを探すソースを作る（hosts: そのSNSのドメイン、makeQueries: 検索語の組み立て）
+function braveSite(label, hosts, makeQueries, defaultOff) {
+  return {
+    name: label, needs: ['BRAVE_SEARCH_API_KEY'], defaultOff: !!defaultOff,
+    async run({ q, tag, mode, sort }) {
+      const term = mode === 'tag' ? '#' + tag : q;
+      const hdr = { headers: { 'X-Subscription-Token': env('BRAVE_SEARCH_API_KEY') } };
+      const call = (query) => {
+        const p = { q: query, count: '20', country: 'jp', search_lang: 'jp' };
+        if (sort === 'latest') p.freshness = 'pm'; // 新着順: 直近1か月に絞る
+        return getJson('https://api.search.brave.com/res/v1/web/search?' + new URLSearchParams(p), hdr);
+      };
+      const rs = await Promise.allSettled(makeQueries(term).map(call));
+      if (rs.every((r) => r.status === 'rejected')) throw rs[0].reason;
+      const seen = new Set();
+      const all = rs.flatMap((r) => (r.status === 'fulfilled' ? r.value.web?.results || [] : []))
+        .filter((r) => { try { const h = new URL(r.url).hostname.replace(/^www\./, ''); return hosts.some((d) => h === d || h.endsWith('.' + d)) && !seen.has(r.url) && seen.add(r.url); } catch { return false; } });
+      return all.map((r) => ({ srcLabel: label, title: stripHtml(r.title), text: clip(stripHtml(r.description)), url: r.url, author: new URL(r.url).hostname.replace(/^www\./, ''), date: r.page_age || undefined, thumb: r.thumbnail?.src }));
+    },
+  };
+}
+
 // 各ソース: { needs: 必要な環境変数(配列), run(ctx) -> items[] }
 // ctx = { q, tag, mode, sort }  ※ q は検索語、tag はタグ（#なし）
 const SOURCES = {
@@ -98,33 +121,15 @@ const SOURCES = {
       }));
     },
   },
-  web: {
-    // Instagram・TikTok・Facebook・Threads・Pinterest・LinkedIn は専用の検索APIが無いため、
-    // Brave Search APIで「site:」検索した結果を取得します（Webに公開されている投稿のみ）。
-    name: 'Web検索(Instagram等)', needs: ['BRAVE_SEARCH_API_KEY'],
-    async run({ q, tag, mode }) {
-      const term = mode === 'tag' ? '#' + tag : q;
-      const sites = ['instagram.com', 'tiktok.com', 'facebook.com', 'threads.net', 'pinterest.com', 'linkedin.com'];
-      const hdr = { headers: { 'X-Subscription-Token': env('BRAVE_SEARCH_API_KEY') } };
-      const call = (query, count) => getJson('https://api.search.brave.com/res/v1/web/search?' + new URLSearchParams({ q: query, count: String(count), country: 'jp', search_lang: 'jp' }), hdr);
-      // Instagram等は1回でまとめて検索。Threadsは埋もれやすいので別に1回検索（合計2リクエスト）
-      const rest = sites.filter((s) => s !== 'threads.net');
-      const [a, b] = await Promise.allSettled([
-        call(`${term} (${rest.map((s) => 'site:' + s).join(' OR ')})`, 20),
-        call(`${term} site:threads.net`, 10),
-      ]);
-      if (a.status === 'rejected' && b.status === 'rejected') throw a.reason;
-      const seen = new Set();
-      const merged = [...(a.value?.web?.results || []), ...(b.value?.web?.results || [])].filter((r) => !seen.has(r.url) && seen.add(r.url));
-      const j = { web: { results: merged } };
-      const labels = { 'instagram.com': 'Instagram', 'tiktok.com': 'TikTok', 'facebook.com': 'Facebook', 'threads.net': 'Threads', 'pinterest.com': 'Pinterest', 'linkedin.com': 'LinkedIn' };
-      return (j.web?.results || []).map((r) => {
-        const host = (r.meta_url?.hostname || new URL(r.url).hostname).replace(/^www\./, '');
-        const key = Object.keys(labels).find((k) => host === k || host.endsWith('.' + k));
-        return { srcLabel: key ? labels[key] : host, title: stripHtml(r.title), text: clip(stripHtml(r.description)), url: r.url, author: host, date: r.page_age || undefined, thumb: r.thumbnail?.src };
-      });
-    },
-  },
+  // Instagram・Threads・TikTok・Facebook・Pinterest・LinkedIn は専用の検索APIが無いため、
+  // Brave Search API で「site:」検索して取得します（Webに公開されているページのみ）。
+  // SNSごとに別々の検索にしているので、1つのSNSだけ検索することもできます。
+  instagram: braveSite('Instagram', ['instagram.com'], (t) => [`${t} site:instagram.com`, `${t} site:instagram.com/reel`, `${t} site:instagram.com/p`]),
+  threads: braveSite('Threads', ['threads.net', 'threads.com'], (t) => [`${t} site:threads.net`, `${t} site:threads.com`]),
+  tiktok: braveSite('TikTok', ['tiktok.com'], (t) => [`${t} site:tiktok.com`], true),
+  facebook: braveSite('Facebook', ['facebook.com'], (t) => [`${t} site:facebook.com`], true),
+  pinterest: braveSite('Pinterest', ['pinterest.com', 'pinterest.jp'], (t) => [`${t} site:pinterest.com`], true),
+  linkedin: braveSite('LinkedIn', ['linkedin.com'], (t) => [`${t} site:linkedin.com`], true),
   hatena: {
     name: 'はてなブックマーク', needs: [],
     async run({ q, tag, mode, sort }) {
@@ -189,7 +194,7 @@ module.exports = async (req, res) => {
 
   if (url.searchParams.get('status')) {
     const sources = {};
-    for (const id of Object.keys(SOURCES)) sources[id] = { name: SOURCES[id].name, ready: configured(id), needs: SOURCES[id].needs, optional: SOURCES[id].optional || [], keyless: SOURCES[id].needs.length === 0 };
+    for (const id of Object.keys(SOURCES)) sources[id] = { name: SOURCES[id].name, ready: configured(id), needs: SOURCES[id].needs, optional: SOURCES[id].optional || [], keyless: SOURCES[id].needs.length === 0, defaultOff: !!SOURCES[id].defaultOff };
     return json(res, 200, { sources, passwordProtected: !!env('APP_PASSWORD') });
   }
 
