@@ -70,6 +70,40 @@
   .news .n b{font-size:14px}
   .news .n p{margin:2px 0 0;font-size:13px}
   .news .new{color:#e11d48;font-size:11px;font-weight:700;margin-left:6px}
+  @media (max-width:600px){
+    .wrap{padding:14px 12px 56px}
+    .head{align-items:center;gap:8px}
+    h1{font-size:20px;margin:0}
+    .sub{display:none}
+    .bell{padding:6px 11px;font-size:12px}
+    form.search{gap:8px}
+    .search input{flex:1 1 100%;min-width:0;font-size:16px;padding:12px 14px}
+    .go{flex:1 1 100%;padding:12px;font-size:16px}
+    .opts{display:grid;grid-template-columns:1fr;gap:8px;margin:12px 0 2px}
+    .seg{display:flex;width:100%}
+    .seg button{flex:1;padding:9px 4px;font-size:13px}
+    .srcs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin:10px -12px 0;padding:2px 12px 6px}
+    .srcs::-webkit-scrollbar{display:none}
+    .src{flex:none;padding:7px 13px;font-size:13px;white-space:nowrap}
+    #quick .src{background:var(--chip);border-color:transparent}
+    .legend{font-size:11px;line-height:1.5}
+    .panels{grid-template-columns:1fr;gap:12px;margin-top:14px}
+    .panel{max-height:none;border-radius:12px}
+    .item{padding:12px 12px}
+    .it{font-size:14.5px;line-height:1.45}
+    .tx{font-size:13px;line-height:1.55;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+    .row{gap:10px}
+    .row img{width:72px;height:72px}
+    .meta{font-size:11px;gap:4px 8px}
+    .msg{padding:14px 12px}
+    .links{margin-top:22px}
+    .links .grid{gap:8px}
+    .links a{padding:9px 14px}
+    .news{padding:10px;align-items:end}
+    .news .box{max-height:85vh;border-radius:16px 16px 12px 12px}
+    .lock form{padding:20px}
+  }
+  @media (max-width:360px){ .seg button{font-size:12px;padding:9px 2px} }
   .spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:s .7s linear infinite;vertical-align:-2px;margin-right:6px}
   @keyframes s{to{transform:rotate(360deg)}}
 </style>
