@@ -79,12 +79,14 @@
     form.search{gap:8px}
     .search input{flex:1 1 100%;min-width:0;font-size:16px;padding:12px 14px}
     .go{flex:1 1 100%;padding:12px;font-size:16px}
-    .opts{display:grid;grid-template-columns:1fr;gap:8px;margin:12px 0 2px}
+    .opts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0 2px}
+    .opts #mode{grid-column:1 / -1}
     .seg{display:flex;width:100%}
-    .seg button{flex:1;padding:9px 4px;font-size:13px}
-    .srcs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin:10px -12px 0;padding:2px 12px 6px}
+    .seg button{flex:1;padding:8px 2px;font-size:13px;white-space:nowrap}
+    .wrap > .srcs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin:10px -12px 0;padding:2px 12px 6px}
     .srcs::-webkit-scrollbar{display:none}
-    .src{flex:none;padding:7px 13px;font-size:13px;white-space:nowrap}
+    .panel .srcs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-top:0}
+    .src{flex:none;padding:6px 12px;font-size:13px;white-space:nowrap}
     #quick .src{background:var(--chip);border-color:transparent}
     .legend{font-size:11px;line-height:1.5}
     .panels{grid-template-columns:1fr;gap:12px;margin-top:14px}

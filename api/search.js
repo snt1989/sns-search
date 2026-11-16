@@ -212,7 +212,7 @@ module.exports = async (req, res) => {
       const items = await SOURCES[id].run({ q, tag, mode, sort });
       out[id] = { ok: true, items: items.filter((i) => /^https?:\/\//.test(i.url || '')) };
     } catch (e) {
-      const hint = e.status === 401 || e.status === 403 ? 'キーが無効、または権限/契約プランが不足しています' : e.status === 429 ? 'リクエスト上限に達しました。しばらく待ってください' : e.name === 'TimeoutError' ? 'タイムアウトしました' : '取得に失敗しました';
+      const hint = id === 'bluesky' && (e.status === 401 || e.status === 403) ? 'Blueskyは、ハンドルとアプリパスワードの設定が必要です' : e.status === 401 || e.status === 403 ? 'キーが無効、または権限/契約プランが不足しています' : e.status === 429 ? 'リクエスト上限に達しました。しばらく待ってください' : e.name === 'TimeoutError' ? 'タイムアウトしました' : '取得に失敗しました';
       out[id] = { ok: false, reason: 'error', message: `${hint} (${e.status || e.name})` };
     }
   }));
