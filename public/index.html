@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SNS横断検索</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<link rel="icon" href="/icon-192.png">
+<meta name="theme-color" content="#1f5eff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="SNS検索">
 <style>
   :root{--bg:#f6f5f1;--card:#fff;--ink:#1d1d1b;--muted:#6b6a65;--line:#e3e1da;--accent:#1f5eff;--accent-ink:#fff;--chip:#ecebe5;--warn:#b45309;--ok:#15803d}
   @media (prefers-color-scheme:dark){:root{--bg:#151513;--card:#1f1f1c;--ink:#f0efe9;--muted:#9a9890;--line:#34332e;--accent:#6d97ff;--accent-ink:#0b1020;--chip:#2a2a26;--warn:#f59e0b;--ok:#4ade80}}
@@ -115,7 +121,7 @@
   <div class="head">
     <div>
       <h1>SNS横断検索</h1>
-      <p class="sub">APIで各SNSの投稿を取得し、このページの中に並べて表示します。キー未設定のSNSは、公式サイトの検索リンクを使えます。</p>
+      <p class="sub">APIで各SNSの投稿を取得し、このページの中に並べて表示します。SNSの名前を押すと、検索するSNSを選べます。</p>
     </div>
     <button type="button" class="bell" id="bell">🔔 お知らせ<span class="badge" id="badge"></span></button>
   </div>
@@ -125,6 +131,8 @@
     <button class="go" id="go" type="submit">検索</button>
   </form>
 
+  <div class="srcs" id="hist"></div>
+
   <div class="opts">
     <span class="seg" id="mode"><button type="button" data-v="kw" class="on">キーワード</button><button type="button" data-v="tag">ハッシュタグ</button></span>
     <span class="seg" id="sort"><button type="button" data-v="relevance" class="on">関連度順</button><button type="button" data-v="latest">新着順</button></span>
@@ -133,7 +141,6 @@
 
   <div class="srcs" id="srcs"></div>
   <div class="srcs" id="quick"></div>
-  <div class="legend"><span class="dot ready" style="display:inline-block"></span> 利用可能　<span class="dot" style="display:inline-block"></span> APIキー未設定（設定するとアプリ内に表示）</div>
 
   <div class="panels" id="panels"></div>
 
@@ -178,7 +185,7 @@
   const ORDER = ['instagram','threads','youtube','x','bluesky','reddit','mastodon','tiktok','facebook','pinterest','linkedin','hatena','qiita','hackernews'];
 
   let status = {}, enabled = new Set(), mode='kw', sort='relevance', view='all', last=null, pw='';
-  try { pw = sessionStorage.getItem('snspw') || ''; } catch(e){}
+  try { pw = localStorage.getItem('snspw') || sessionStorage.getItem('snspw') || ''; } catch(e){}
 
   function tagOf(v){ return v.replace(/^[#＃]+/,'').trim().split(/\s+/)[0] || ''; }
   function build(tpl, q){
@@ -212,23 +219,27 @@
   function showLock(msg){ $('lock').classList.add('show'); $('lockErr').textContent = msg||''; setTimeout(()=>$('pw').focus(),50); }
   $('lockForm').addEventListener('submit', async e=>{
     e.preventDefault(); pw=$('pw').value;
-    try{ await api({status:1}); try{sessionStorage.setItem('snspw',pw);}catch(_){} $('lock').classList.remove('show'); init(); }
+    try{ await api({status:1}); try{localStorage.setItem('snspw',pw);}catch(_){} $('lock').classList.remove('show'); init(); }
     catch(err){ $('lockErr').textContent='パスワードが違います'; }
   });
 
   function renderSrcs(){
     const box=$('srcs'); box.innerHTML='';
-    ORDER.filter(id=>status[id]).forEach(id=>{
+    ORDER.filter(id=>status[id]&&status[id].ready).forEach(id=>{
       const s=status[id];
       const b=el('button','src'+(enabled.has(id)?'':' off')); b.type='button';
       const d=el('span','dot'+(s.ready?' ready':'')); b.append(d, s.name);
-      b.onclick=()=>{ enabled.has(id)?enabled.delete(id):enabled.add(id); try{localStorage.setItem('snsEnabled2',JSON.stringify([...enabled]));}catch(_){} renderSrcs(); };
+      b.onclick=()=>{ enabled.has(id)?enabled.delete(id):enabled.add(id); try{localStorage.setItem('snsEnabled2',JSON.stringify([...enabled]));}catch(_){} renderSrcs(); if(last) search(); };
       box.appendChild(b);
     });
   }
 
   // お知らせ（新しいものを上に追加してください。idは重複しないように）
   const NEWS = [
+    {id:'2026-11-20-a', date:'2026/11/20', title:'履歴とお気に入りが使えます', body:'検索した言葉が、検索ボックスの下に残ります。「☆ この検索を保存」を押すと、お気に入りとしていつでも呼び出せます。'},
+    {id:'2026-11-20-b', date:'2026/11/20', title:'投稿・リール・アカウントで絞り込めます', body:'InstagramとThreadsの結果に種類が付きました。「投稿だけ」などのボタンで絞り込めます。'},
+    {id:'2026-11-20-c', date:'2026/11/20', title:'検索回数を節約するようになりました', body:'同じ検索は結果を覚えているので、並び順やSNSを切り替えても、無料枠を余計に使いません（ページを開いている間）。'},
+    {id:'2026-11-20-d', date:'2026/11/20', title:'ホーム画面に追加できます', body:'ブラウザの「ホーム画面に追加」で、アプリのように開けます。パスワードもこの端末に記憶されます。'},
     {id:'2026-11-17-a', date:'2026/11/17', title:'SNSごとに検索できるようになりました', body:'SNSの名前を押すと、オン・オフを切り替えられます。「Instagram＋Threadsだけ」などのボタンで、すぐに絞り込めます。'},
     {id:'2026-11-17-b', date:'2026/11/17', title:'InstagramとThreadsの検索を強化しました', body:'個別の投稿やリール動画も出るようになりました。公開されていて、検索エンジンに載っているものだけが対象です。'},
     {id:'2026-11-17-c', date:'2026/11/17', title:'検索の回数について', body:'Instagramは1回の検索で3回、Threadsは2回、無料枠(月およそ1,000回)を使います。TikTokなどは、最初はオフにしてあります。'}
@@ -256,10 +267,10 @@
 
   function renderQuick(){
     const box=$('quick'); box.innerHTML='';
-    const presets=[['Instagram＋Threadsだけ',['instagram','threads']],['Instagramだけ',['instagram']],['Threadsだけ',['threads']],['すべてON',ORDER.filter(id=>status[id])]];
+    const presets=[['Instagram＋Threadsだけ',['instagram','threads']],['Instagramだけ',['instagram']],['Threadsだけ',['threads']],['すべてON',ORDER.filter(id=>status[id]&&status[id].ready)]];
     presets.forEach(([label,ids])=>{
       const b=el('button','src',label); b.type='button';
-      b.onclick=()=>{ enabled=new Set(ids.filter(id=>status[id])); try{localStorage.setItem('snsEnabled2',JSON.stringify([...enabled]));}catch(_){} renderSrcs(); if($('q').value.trim()) search(); };
+      b.onclick=()=>{ enabled=new Set(ids.filter(id=>status[id]&&status[id].ready)); try{localStorage.setItem('snsEnabled2',JSON.stringify([...enabled]));}catch(_){} renderSrcs(); if($('q').value.trim()) search(); };
       box.appendChild(b);
     });
   }
@@ -277,18 +288,20 @@
   function itemNode(it, showSrc){
     const a=el('a','item'); a.href=it.url; a.target='_blank'; a.rel='noopener noreferrer';
     const row=el('div','row');
-    if(it.thumb && /^https?:/.test(it.thumb)){ const im=el('img'); im.src=it.thumb; im.loading='lazy'; im.referrerPolicy='no-referrer'; im.alt=''; row.appendChild(im); }
+    if(it.thumb && /^https?:/.test(it.thumb)){ const im=el('img'); im.src=it.thumb; im.loading='lazy'; im.referrerPolicy='no-referrer'; im.alt=''; im.onerror=()=>im.remove(); row.appendChild(im); }
     const body=el('div');
     if(it.title) body.appendChild(el('div','it',it.title));
     if(it.text) body.appendChild(el('div','tx',it.text));
     const meta=el('div','meta');
-    if(showSrc) meta.appendChild(el('span',null,'['+showSrc+']'));
+    if(showSrc) meta.appendChild(el('span',null,'['+showSrc+(it.kind?'・'+it.kind:'')+']'));
+    else if(it.kind) meta.appendChild(el('span',null,'['+it.kind+']'));
     [it.author, fmtDate(it.date), it.metrics].forEach(x=>{ if(x) meta.appendChild(el('span',null,x)); });
     body.appendChild(meta); row.appendChild(body); a.appendChild(row);
     return a;
   }
 
   let filter = null; // 表示するSNS名（nullは全部）
+  let kindFilter = null; // 投稿・リール・アカウントの絞り込み（nullは全部）
   function collect(data, ids){
     const groups = {};   // 表示名 -> items[]
     const failed = [];
@@ -302,7 +315,10 @@
   function mergeItems(groups, sortMode){
     const lists = Object.values(groups);
     if(sortMode==='latest'){
-      return lists.flat().sort((a,b)=>(new Date(b.date)||0)-(new Date(a.date)||0));
+      // 日付のあるものを新しい順に。日付の無いものは後ろへ
+      const t=x=>{ const d=Date.parse(x.date); return isNaN(d)?null:d; };
+      const all=lists.flat();
+      return all.filter(x=>t(x)!==null).sort((a,b)=>t(b)-t(a)).concat(all.filter(x=>t(x)===null));
     }
     // 関連度順: 各SNSから1件ずつ順番に取り出して混ぜる（1つのSNSに偏らないように）
     const out=[]; let i=0, more=true;
@@ -314,7 +330,7 @@
     const P=$('panels'); P.innerHTML='';
     if(!last) return;
     const {q, data} = last;
-    const ids = ORDER.filter(id=>enabled.has(id) && status[id]);
+    const ids = ORDER.filter(id=>enabled.has(id) && status[id] && status[id].ready);
     const {groups, failed} = collect(data, ids);
 
     if(view==='all'){
@@ -343,7 +359,17 @@
       }
 
       const box=el('div','items'); box.style.maxHeight='none';
-      let list = mergeItems(filter&&groups[filter]?{[filter]:groups[filter]}:groups, sort);
+      let src = filter&&groups[filter]?{[filter]:groups[filter]}:groups;
+      const kinds=['投稿','リール','アカウント'].filter(k=>Object.values(src).some(l=>l.some(i=>i.kind===k)));
+      if(kindFilter && !kinds.includes(kindFilter)) kindFilter=null;
+      if(kinds.length>1){
+        const kc=el('div','srcs'); kc.style.padding='8px 14px 0';
+        const mkk=(label,key)=>{ const b=el('button','src'+(kindFilter===key?'':' off'),label); b.type='button'; b.onclick=()=>{kindFilter=key; render();}; return b; };
+        kc.appendChild(mkk('種類：すべて',null)); kinds.forEach(k=>kc.appendChild(mkk(k+'だけ',k)));
+        wrap.insertBefore(kc, chips.nextSibling);
+      }
+      if(kindFilter) src=Object.fromEntries(Object.entries(src).map(([k,l])=>[k,l.filter(i=>i.kind===kindFilter)]));
+      let list = mergeItems(src, sort);
       list.forEach(i=>box.appendChild(itemNode(i,i._s)));
       if(!list.length) box.appendChild(el('div','msg','表示できる結果がありません。'));
       wrap.appendChild(box); P.appendChild(wrap);
@@ -378,18 +404,51 @@
     panel.appendChild(m); return panel;
   }
 
+  // 同じ検索はSNSごとに結果を覚えておき、検索回数（無料枠）を節約する
+  const cache=new Map();
   async function search(){
     const q=$('q').value.trim(); if(!q) return;
-    const ids=ORDER.filter(id=>enabled.has(id)&&status[id]);
-    $('go').disabled=true;
-    const P=$('panels'); P.innerHTML=''; const w=el('div','msg'); w.appendChild(el('span','spin')); w.append('検索中…'); P.appendChild(w);
+    const m=mode, s=sort;
+    const ids=ORDER.filter(id=>enabled.has(id)&&status[id]&&status[id].ready);
+    const P=$('panels');
+    if(!ids.length){ P.innerHTML=''; P.appendChild(el('div','msg','検索するSNSを1つ以上選んでください。')); return; }
+    const key=id=>[m,s,q,id].join('\u0001');
+    const need=ids.filter(id=>!cache.has(key(id)));
     renderLinks(q);
+    const fresh={};
     try{
-      const data=await api({q, mode, sort, sources: ids.join(',')});
-      last={q,data}; filter=null; render();
+      if(need.length){
+        $('go').disabled=true;
+        P.innerHTML=''; const w=el('div','msg'); w.appendChild(el('span','spin')); w.append('検索中…'); P.appendChild(w);
+        const data=await api({q, mode:m, sort:s, sources: need.join(',')});
+        if(cache.size>300) cache.clear();
+        need.forEach(id=>{ const r=data.results[id]; if(r&&r.ok) cache.set(key(id),r); else if(r) fresh[id]=r; });
+      }
+      const results={}; ids.forEach(id=>{ const r=cache.get(key(id))||fresh[id]; if(r) results[id]=r; });
+      last={q,data:{results}}; filter=null; kindFilter=null; addHistory(q); render();
     }catch(e){
       if(e.message!=='locked'){ P.innerHTML=''; P.appendChild(el('div','msg err','検索に失敗しました: '+e.message)); }
     }finally{ $('go').disabled=false; }
+  }
+
+  // 検索履歴とお気に入り（この端末に保存）
+  function load(k){ try{ const v=JSON.parse(localStorage.getItem(k)||'[]'); return Array.isArray(v)?v:[]; }catch(_){ return []; } }
+  function save(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(_){} }
+  function addHistory(q){ save('snsHist',[q].concat(load('snsHist').filter(x=>x!==q)).slice(0,8)); renderHist(); }
+  function renderHist(){
+    const box=$('hist'); box.innerHTML='';
+    const favs=load('snsFav'), hist=load('snsHist').filter(x=>!favs.includes(x));
+    const cur=last&&last.q;
+    if(cur){
+      const on=favs.includes(cur);
+      const b=el('button','src',on?'★ 保存済み（押すと解除）':'☆ この検索を保存'); b.type='button';
+      b.onclick=()=>{ save('snsFav', on?favs.filter(x=>x!==cur):[cur].concat(favs).slice(0,12)); renderHist(); };
+      box.appendChild(b);
+    }
+    const go=(q)=>{ $('q').value=q; search(); };
+    favs.forEach(q=>{ const b=el('button','src','★ '+q); b.type='button'; b.onclick=()=>go(q); box.appendChild(b); });
+    hist.forEach(q=>{ const b=el('button','src off',q); b.type='button'; b.onclick=()=>go(q); box.appendChild(b); });
+    if(hist.length){ const b=el('button','src off','履歴を消す'); b.type='button'; b.onclick=()=>{ save('snsHist',[]); renderHist(); }; box.appendChild(b); }
   }
 
   function seg(id, set){
@@ -407,9 +466,9 @@
     try{
       const s=await api({status:1}); status=s.sources;
       let saved=null; try{ saved=JSON.parse(localStorage.getItem('snsEnabled2')||'null'); }catch(_){}
-      enabled = new Set(Array.isArray(saved) ? saved.filter(id=>status[id]) : ORDER.filter(id=>status[id] && status[id].ready && !status[id].defaultOff));
-      if(!enabled.size) ORDER.forEach(id=>status[id]&&enabled.add(id));
-      renderSrcs(); renderQuick(); renderLinks('');
+      enabled = new Set(Array.isArray(saved) ? saved.filter(id=>status[id]&&status[id].ready) : ORDER.filter(id=>status[id] && status[id].ready && !status[id].defaultOff));
+      if(!enabled.size) ORDER.forEach(id=>status[id]&&status[id].ready&&!status[id].defaultOff&&enabled.add(id));
+      renderSrcs(); renderQuick(); renderHist(); renderLinks('');
     }catch(e){ if(e.message!=='locked') $('panels').appendChild(el('div','msg err','サーバーに接続できません: '+e.message)); }
   }
   init();
