@@ -21,7 +21,7 @@ const stripHtml = (s) => String(s || '').replace(/<[^>]*>/g, ' ').replace(/&#x([
 
 
 const cleanTitle = (s) => s.replace(/\s*[•·|\-–]\s*Instagram(\s+photos and videos)?\s*$/i, '').replace(/\s*[•·|]\s*Threads(,\s*Say more)?\s*$/i, '').replace(/\s+on Threads\s*$/i, '').trim();
-const cleanText = (s) => s.replace(/Join Threads to share ideas[^.]*\.(\s*Log in with your Instagram\.?)?/i, '').replace(/^\s*Log in with your Instagram\.?/i, '').trim();
+const cleanText = (s) => s.replace(/Join Threads to share ideas[^.]*\.(\s*Log in with your Instagram\.?)?/i, '').replace(/^\s*Log in with your Instagram\.?/i, '').replace(/Create an account or log in to Instagram\s*[-–—]?\s*(Share what you.re into with the people who get you\.?)?/i, '').trim();
 const kindOf = (label, u) => {
   const p = new URL(u).pathname;
   if (label === 'Instagram') return /\/reels?\//.test(p) ? 'リール' : /\/p\//.test(p) ? '投稿' : 'アカウント';
@@ -46,7 +46,7 @@ function braveSite(label, hosts, makeQueries, defaultOff) {
       const seen = new Set();
       const all = rs.flatMap((r) => (r.status === 'fulfilled' ? r.value.web?.results || [] : []))
         .filter((r) => { try { const h = new URL(r.url).hostname.replace(/^www\./, ''); return hosts.some((d) => h === d || h.endsWith('.' + d)) && !seen.has(r.url) && seen.add(r.url); } catch { return false; } });
-      return all.map((r) => ({ srcLabel: label, kind: kindOf(label, r.url), title: cleanTitle(stripHtml(r.title)), text: clip(cleanText(stripHtml(r.description))), url: r.url, author: new URL(r.url).hostname.replace(/^www\./, ''), date: r.page_age || undefined, thumb: r.thumbnail?.src }));
+      return all.map((r) => ({ srcLabel: label, kind: kindOf(label, r.url), title: (cleanTitle(stripHtml(r.title)).replace(/^(Instagram|Threads)$/i, '') || label + 'の' + (kindOf(label, r.url) || 'ページ') + '（内容は開いて確認）'), text: clip(cleanText(stripHtml(r.description))), url: r.url, author: new URL(r.url).hostname.replace(/^www\./, ''), date: r.page_age || undefined, thumb: r.thumbnail?.src }));
     },
   };
 }
